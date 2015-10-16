@@ -69,9 +69,11 @@ def writeToOutput(ccaDoc, outputDir):
 
 def convertToCCA(dataDir, urlDomain, outputDir):
 	htmlFileList = list_files(dataDir)
+	counter = 0
 	for file in htmlFileList:
 		creationTime = int(os.path.getctime(file))
 		url = urlDomain + os.path.basename(file)
+		print(Processing file : " + url")
 		imported = creationTime
 		response = {}
 		response["body"] = getFileContents(file)
@@ -83,11 +85,10 @@ def convertToCCA(dataDir, urlDomain, outputDir):
 		ccaDoc["imported"] = imported
 		ccaDoc["response"] = response
 		ccaDoc["key"] = key
-
 		writeToOutput(ccaDoc,outputDir)
+		counter += 1
 		# print(response["body"])
-		exit()
-
+	print("Converted : " + str(counter) + " documents")
 
 def main(argv=None):
    if argv is None:
