@@ -71,7 +71,7 @@ def convertToCCA(dataDir, urlDomain, outputDir):
 	htmlFileList = list_files(dataDir)
 	counter = 0
 	for file in htmlFileList:
-		creationTime = int(os.path.getctime(file))
+		creationTime = int(os.stat(file).st_atime)
 		url = urlDomain + os.path.basename(file)
 		print(Processing file : " + url")
 		imported = creationTime
