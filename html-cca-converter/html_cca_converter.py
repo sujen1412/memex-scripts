@@ -8,6 +8,7 @@ import getopt
 from urlparse import urlparse
 import hashlib
 import json
+from multiprocessing import Pool
 
 _helpMessage = '''
 
@@ -21,135 +22,156 @@ Operation:
 -o --outputDir
 	The path to an outputDir where the CCA documents will be stored 
 '''
+
+global urlDomain
+global outputDir
+
 class _Usage(Exception):
     '''An error for problems with arguments on the command line.'''
+
     def __init__(self, msg):
         self.msg = msg
 
-def list_files(dir):                                                                                                  
-    r = []                                                                                                            
-    subdirs = [x[0] for x in os.walk(dir)]                                                                            
-    for subdir in subdirs:                                                                                            
-        files = os.walk(subdir).next()[2]                                                                             
-        if (len(files) > 0):                                                                                          
-            for file in files:                                                                                        
-                r.append(subdir + "/" + file)                                                                         
-    return r 
 
-def getKey(url):
-	hostname = urlparse(url).hostname
-	hostname = hostname.replace(".","_").split("_")[::-1]
-	reverseUrl = ''
-	for s in hostname:
-		reverseUrl += s +'_'
-	hashed = hashlib.sha256()
-	hashed.update(url)
-	urlSHAHex = hashed.hexdigest()
-	key = reverseUrl+urlSHAHex
+def list_files(dir):
+    r = []
+    subdirs = [x[0] for x in os.walk(dir)]
+    for subdir in subdirs:
+        files = os.walk(subdir).next()[2]
+        if (len(files) > 0):
+            for file in files:
+                r.append(subdir + "/" + file)
+    return r
 
-	return key
+
+def getKey(url, creationTime):
+    stringToHash = url + "-" + str(creationTime)
+    hashed = hashlib.sha256()
+    hashed.update(stringToHash)
+    urlSHAHex = hashed.hexdigest()
+    key = urlSHAHex.upper()
+    return key
+
 
 def getContentType():
-	contentType = 'text/html'
-	return contentType
+    contentType = 'text/html'
+    return contentType
+
 
 def getFileContents(file):
-	f = open(file, "r")
-	content = f.read()
-	content = "<html><head></head><body> " + content + "</body></html>"
-	f.close()
-	return content
+    f = open(file, "r")
+    content = f.read()
+    content = "<html><head></head><body> " + content + "</body></html>"
+    f.close()
+    return content
+
 
 def writeToOutput(ccaDoc, outputDir):
-	if not os.path.exists(outputDir):
-		os.makedirs(outputDir)
-		print(outputDir)
-	outputPath = outputDir + "/" + ccaDoc["key"]
-	f = open(outputPath,"w")
-	f.write(cbor.dumps(json.dumps(ccaDoc)))
-	f.close()
+    if not os.path.exists(outputDir):
+        os.makedirs(outputDir)
+        print(outputDir)
+    outputPath = outputDir + "/" + ccaDoc["key"]
+    f = open(outputPath, "w")
+    f.write(cbor.dumps(json.dumps(ccaDoc)))
+    f.close()
+
 
 def getCCA(file, urlDomain):
-	creationTime = int(os.stat(file).st_atime)
-	url = urlDomain + os.path.basename(file)
-	print("Processing file : " + url)
-	imported = creationTime
-	response = {}
-	response["body"] = getFileContents(file)
-	response["headers"] = {}
-	response["headers"]["Content-Type"] = getContentType()
-	key = getKey(url)
-	ccaDoc = {}
-	ccaDoc["url"] = url
-	ccaDoc["imported"] = imported
-	ccaDoc["response"] = response
-	ccaDoc["key"] = key
-	return ccaDoc
+    creationTime = int(os.stat(file).st_atime)
+    url = urlDomain + os.path.basename(file)
+    # print("Processing file : " + url)
+    imported = creationTime
+    response = {}
+    response["body"] = getFileContents(file)
+    response["headers"] = {}
+    response["headers"]["Content-Type"] = getContentType()
+    key = getKey(url, creationTime)
+    ccaDoc = {}
+    ccaDoc["url"] = url
+    ccaDoc["imported"] = imported
+    ccaDoc["response"] = response
+    ccaDoc["key"] = key
+    return ccaDoc
+
+
+def convertFileToCCA(file):
+    global urlDomain
+    global outputDir
+    ccaDoc = getCCA(file, urlDomain)
+    writeToOutput(ccaDoc, outputDir)
+    print ("Converted " + str(file) + " to " + ccaDoc["key"])
+
 
 def convertToCCA(dataDir, urlDomain, outputDir):
-	htmlFileList = list_files(dataDir)	
-	counter = 0
-	for file in htmlFileList:
-		# creationTime = int(os.stat(file).st_atime)
-		# url = urlDomain + os.path.basename(file)
-		# print("Processing file : " + url)
-		# imported = creationTime
-		# response = {}
-		# response["body"] = getFileContents(file)
-		# response["headers"] = {}
-		# response["headers"]["Content-Type"] = getContentType()
-		# key = getKey(url)
-		# ccaDoc = {}
-		# ccaDoc["url"] = url
-		# ccaDoc["imported"] = imported
-		# ccaDoc["response"] = response
-		# ccaDoc["key"] = key
-		ccaDoc = getCCA(file, urlDomain)
-		writeToOutput(ccaDoc,outputDir)
-		counter += 1
-		# print(response["body"])
-	print("Converted : " + str(counter) + " documents")
+    htmlFileList = list_files(dataDir)
+    pool = Pool(3)
+    results = pool.map(convertFileToCCA, htmlFileList)
+    pool.close()
+    pool.join()
+    # for file in htmlFileList:
+    #     # creationTime = int(os.stat(file).st_atime)
+    #     # url = urlDomain + os.path.basename(file)
+    #     # print("Processing file : " + url)
+    #     # imported = creationTime
+    #     # response = {}
+    #     # response["body"] = getFileContents(file)
+    #     # response["headers"] = {}
+    #     # response["headers"]["Content-Type"] = getContentType()
+    #     # key = getKey(url)
+    #     # ccaDoc = {}
+    #     # ccaDoc["url"] = url
+    #     # ccaDoc["imported"] = imported
+    #     # ccaDoc["response"] = response
+    #     # ccaDoc["key"] = key
+    #     ccaDoc = getCCA(file, urlDomain)
+        # writeToOutput(ccaDoc, outputDir)
+        # counter += 1
+    # print(response["body"])
+    print("Converted documents")
+
 
 def main(argv=None):
-	if argv is None:
-		argv = sys.argv
+    if argv is None:
+        argv = sys.argv
+    global urlDomain
+    global outputDir
+    try:
+        try:
+            opts, args = getopt.getopt(argv[1:], 'hv:d:u:o:', ['help', 'verbose', 'dataDir=', 'url=', 'outputDir='])
+        except getopt.error, msg:
+            raise _Usage(msg)
 
-	try:
-		try:
-			opts, args = getopt.getopt(argv[1:],'hv:d:u:o:',['help', 'verbose', 'dataDir=', 'url=', 'outputDir='])
-		except getopt.error, msg:
-			raise _Usage(msg)    
+        if len(opts) == 0:
+            raise _Usage(_helpMessage)
+        team = None
+        crawlerId = None
+        dataDir = None
+        url = None
+        index = None
 
-		if len(opts) == 0:
-			raise _Usage(_helpMessage)
-		team=None
-		crawlerId=None
-		dataDir=None
-		url=None
-		index=None
-		outputDir=None
+        for option, value in opts:
+            if option in ('-h', '--help'):
+                raise _Usage(_helpMessage)
+            elif option in ('-v', '--verbose'):
+                global _verbose
+                _verbose = True
+            elif option in ('-d', '--dataDir'):
+                dataDir = value
+            elif option in ('-u', '--url'):
+                url = value
+            elif option in ('-o', '--outputDir'):
+                outputDir = value
 
-		for option, value in opts:           
-			if option in ('-h', '--help'):
-				 raise _Usage(_helpMessage)
-			elif option in ('-v', '--verbose'):
-				 global _verbose
-				 _verbose = True
-			elif option in ('-d', '--dataDir'):
-				 dataDir = value
-			elif option in ('-u', '--url'):
-				  url = value
-			elif option in ('-o', '--outputDir'):
-				  outputDir = value
+        if dataDir == None or url == None or outputDir == None:
+            raise _Usage(_helpMessage)
+        urlDomain = url
 
-		if dataDir == None or url == None or outputDir == None:
-			raise _Usage(_helpMessage)
+        convertToCCA(dataDir, url, outputDir)
 
-		convertToCCA(dataDir, url, outputDir)
+    except _Usage, err:
+        print >> sys.stderr, sys.argv[0].split('/')[-1] + ': ' + str(err.msg)
+        return 2
 
-	except _Usage, err:
-		print >>sys.stderr, sys.argv[0].split('/')[-1] + ': ' + str(err.msg)
-		return 2
 
 if __name__ == "__main__":
-   sys.exit(main())
+    sys.exit(main())
