@@ -130,7 +130,6 @@ def esIndexDoc(f, team, crawler, index, docType, failedList, failedReasons, proc
                 parsed = parser.from_buffer(ccaDoc["response"]["body"].encode("utf-8"))
                 newDoc["crawl_data"] = {}
                 if "content" in parsed:
-                    newDoc["crawl_data"]["content"] = parsed["content"]
                     newDoc["extracted_text"] = parsed["content"]
                 if 'inlinks' in ccaDoc and ccaDoc['inlinks']:
                     newDoc["crawl_data"]["obj_parents"] = ccaDoc['inlinks']
