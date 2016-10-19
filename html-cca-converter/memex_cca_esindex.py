@@ -55,8 +55,10 @@ import cbor
 import sys
 import getopt
 import hashlib
+import datetime
 from multiprocessing import Pool
 from functools import partial
+
 
 _verbose = False
 _helpMessage = '''
@@ -120,7 +122,7 @@ def esIndexDoc(f, team, crawler, index, docType, failedList, failedReasons, proc
                 ccaDoc = json.loads(cbor.loads(c), encoding='utf8')
                 newDoc["url"] = ccaDoc["url"]
 
-                newDoc["timestamp"] = ccaDoc["imported"]
+                newDoc["timestamp"] = datetime.datetime.fromtimestamp(ccaDoc["imported"])
                 newDoc["team"] = team
                 newDoc["crawler"] = crawler
 
