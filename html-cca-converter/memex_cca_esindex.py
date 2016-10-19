@@ -97,8 +97,8 @@ def list_files(dir):
 
 def getContentType(ccaDoc):
     for header in ccaDoc["response"]["headers"]:
-        if header[0] == "Content-Type":
-            return header[1]
+        if "Content-Type" in header:
+            return ccaDoc["response"]["headers"]["Content-Type"]
     return "application/octet-stream"
 
 def indexDoc(url, doc, index, docType):
