@@ -104,19 +104,20 @@ def getContentType(ccaDoc):
 def indexDoc(url, doc, index, docType):
     print "Indexing "+doc["url"]+" to ES at: ["+url+"]"
     es = Elasticsearch([url])
-    res = es.index(index=index, doc_type=docType, id=doc["_id"], body=doc)
+    res = es.index(index=index, doc_type=docType, id=doc["id"], body=doc)
     print(res['created'])
 
-def esIndexDoc(f, team, crawler, index, docType, failedList, failedReasons, procCount, url=None, outPath=None, storeprefix=None):
+def esIndexDoc(f, team, crawler, index, docType, failedList, failedReasons, procCount,
+               url=None, outPath=None, storeprefix=None):
     CDRVersion = 2.0
-    outFile = codecs.open(outPath, 'w', 'utf-8') if outPath else None
+    outFile = codecs.open(outPath +"/" + str(os.path.basename(f)), 'w', 'utf-8') if outPath else None
     with open(f, 'r') as fd:
             try:
                 newDoc = {}
                 c = fd.read()
                 # fix for no request body out of Nutch CCA
                 c.replace("\"body\" : null", "\"body\" : \"null\"")
-                ccaDoc = json.loads(cbor.loads(c).value, encoding='utf8')
+                ccaDoc = json.loads(cbor.loads(c), encoding='utf8')
                 newDoc["url"] = ccaDoc["url"]
 
                 newDoc["timestamp"] = ccaDoc["imported"]
@@ -135,7 +136,7 @@ def esIndexDoc(f, team, crawler, index, docType, failedList, failedReasons, proc
                     newDoc["crawl_data"]["obj_parents"] = ccaDoc['inlinks']
                     newDoc["obj_parent"] = ccaDoc['inlinks'][0]
                 # CDR version 2.0 additions
-                newDoc["_id"] = ccaDoc["key"]
+                newDoc["id"] = ccaDoc["key"]
                 newDoc["obj_original_url"] = ccaDoc["url"]
 
                 if 'text' in contentType or 'ml' in contentType:
@@ -154,6 +155,7 @@ def esIndexDoc(f, team, crawler, index, docType, failedList, failedReasons, proc
                 if outFile:
                     outFile.write(json.dumps(newDoc))
                     outFile.write("\n")
+                    print "Processed " + f + " successfully"
                 procCount += 1
             except Exception as err:
                 failedList.append(f)
@@ -170,10 +172,10 @@ def esIndex(ccaDir, team, crawler, index, docType, url=None, outPath=None, store
     failedList=[]
     failedReasons=[]
     CDRVersion = 2.0
-    outFile = codecs.open(outPath, 'w', 'utf-8') if outPath else None
+    # outFile = codecs.open(outPath, 'w', 'utf-8') if outPath else None
 
     pool = Pool(processes=3)
-    results = pool.map(partial(esIndexDoc(), team=team, crawler=crawler, index=index,
+    results = pool.map(partial(esIndexDoc, team=team, crawler=crawler, index=index,
                                docType=docType, failedList=failedList, failedReasons=failedReasons, procCount=procCount,
                                url=url, outPath=outPath, storeprefix=storeprefix), ccaJsonList)
     pool.close()
@@ -229,9 +231,9 @@ def esIndex(ccaDir, team, crawler, index, docType, url=None, outPath=None, store
     #             failedList.append(f)
     #             failedReasons.append(str(err))
     #             traceback.print_exc()
-    if outFile:
-        print("Output Stored at %s" % outPath)
-        outFile.close()
+    # if outFile:
+    #     print("Output Stored at %s" % outPath)
+    #     outFile.close()
     print "Processed " + str(procCount) + " CBOR files successfully."
     print "Failed files: " + str(len(failedList))
 
